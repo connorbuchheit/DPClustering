@@ -1,6 +1,7 @@
 from dbscan import dbscan
 from k_means import k_means
 from generate_data import generate_clusters
+from add_noise_to_data import synth_data
 import matplotlib.pyplot as plt
 
 # Generate clusters + run algorithms
