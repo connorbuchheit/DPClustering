@@ -30,7 +30,6 @@ def test_kmeans():
     # print("Labels (add_noise_to_data):", dp_labels2)
 
     from sklearn.metrics import adjusted_rand_score
-
     print("ARI (add_noise_to_centroids):", adjusted_rand_score(labels, dp_labels1))
     print("ARI (add_noise_to_data):", adjusted_rand_score(labels, dp_labels2))
 
@@ -58,6 +57,7 @@ def test_dbscan():
 
     from sklearn.metrics import adjusted_rand_score
 
+    print("--------------------------")
     print("ARI (add_noise_to_densities):", adjusted_rand_score(labels, dp_labels1))
     print("ARI (add_noise_to_distances):", adjusted_rand_score(labels, dp_labels2))
     print("ARI (add_noise_to_data):", adjusted_rand_score(labels, dp_labels3))

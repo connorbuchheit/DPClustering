@@ -18,21 +18,55 @@ Our primary goal is to explore the tradeoffs between data privacy and clustering
 | Synthetic Data Generation | Utility function (`generate_data.py`) to create simple clustered datasets for testing                                          |
 | Basic Visualization       | `main.py` script generates synthetic data, runs both non-private algorithms, and visualizes results using Matplotlib           |
 
-### Usage (Current Baseline)
+### Usage
 
-To run the current non-private implementations and see the visualization, ensure numpy and matplotlib are installed, then run the `main.py` script:
+To run the current non-private implementations and see the visualization:
 
-```bash
-pip install numpy matplotlib
-```
-
-Then:
-- clone the repository
-- navigate to the project directory in your terminal
-- run the main script:
+1. clone the repository
+2. install the required packages
+3. run the main script:
 
 ```bash
+pip install -r requirements.txt
 python main.py
 ```
 
 *this will generate synthetic data, run k-means and DBSCAN, and display a plot comparing their outputs.*
+
+#### Tests
+
+To run the clustering tests located in the `tests/` folder, use the provided `Makefile`:
+
+```bash
+make test
+```
+
+This sets the `PYTHONPATH` automatically. Alternatively, you can still run:
+
+```bash
+python tests/test.py
+```
+
+But ensure you have set the `PYTHONPATH` correctly to include the current directory, or you will encounter a `ModuleNotFoundError`:
+
+##### Common Error
+
+If you encounter the following:
+
+```bash
+python tests/test.py
+Traceback (most recent call last):
+  File "/Users/bqr/class/208/DPClustering/tests/test.py", line 1, in <module>
+    import dpclustering as dpc
+ModuleNotFoundError: No module named 'dpclustering'
+```
+
+You would need to set the `PYTHONPATH` to the current directory so Python can find the `dpclustering` module. A simple way to do this is by running:
+
+```bash
+export PYTHONPATH=$PWD #this initialises a new environment variable $PYTHONPATH, and gives it value of the current working directory ($PWD == print working directory)
+
+python tests/test.py
+--------------------------
+ARI (add_noise_to_densi...
+```

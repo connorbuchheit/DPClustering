@@ -1,6 +1,5 @@
-from clustering.k_means import k_means
-from clustering.dp_k_means import add_noise_to_centroids_and_relabel, add_noise_to_input_data
-from data.generate_data import generate_clusters
+from dpclustering.data import generate_clusters, add_noise_to_data
+from dpclustering.kmeans import KMeans
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -22,22 +21,19 @@ X = generate_clusters(
 )
 X = np.clip(X, -DATA_BOUND_B, DATA_BOUND_B)
 
-# algoritms
+# algorithms
 # a. original K-Means (non-DP)
-original_centroids, original_labels = k_means(X, k=N_CLUSTERS)
+# instantiate and fit k-means
+kmeans = KMeans(X, N_CLUSTERS, DATA_BOUND_B)
+original_centroids, original_labels = kmeans.fit()
 
 # b. DP K-Means --> add noise to centroids (output perturbation on centroids)
-dp_centroids_noisy, dp_labels_noisy_centroids = add_noise_to_centroids_and_relabel(
-    X, original_centroids, original_labels, epsilon=EPSILON, b=DATA_BOUND_B
-)
+dp_centroids_noisy, dp_labels_noisy_centroids = kmeans.add_noise_to_centroids(EPSILON)
 
-# c. DP --> process via input perturbation (add noise to data, then cluster)
-noisy_X_input_perturb = add_noise_to_input_data(
-    X, epsilon=EPSILON, b=DATA_BOUND_B
-)
-centroids_from_noisy_data, labels_from_noisy_data = k_means(
-    noisy_X_input_perturb, k=N_CLUSTERS
-)
+# c. DP --> input perturbation: add noise to data, then recluster
+noisy_X = add_noise_to_data(X, EPSILON, b=DATA_BOUND_B)
+dp_kmeans = KMeans(noisy_X, N_CLUSTERS, DATA_BOUND_B)
+centroids_from_noisy_data, labels_from_noisy_data = dp_kmeans.fit()
 
 # plotting
 cmap = 'tab10'
