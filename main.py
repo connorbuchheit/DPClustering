@@ -42,7 +42,7 @@ plt.figure(figsize=(18, 5)) #12,5 --> 18,5 to accommodate third plot
 # a. non-DP DBSCAN
 plt.subplot(1, 3, 1)
 plt.scatter(X[:, 0], X[:, 1], c=dbscan_labels, cmap='tab10', s=15, alpha=0.7)
-plt.title("Non-dp DBSCAN Clustering")
+plt.title("Non-DP DBSCAN Clustering")
 plt.xlabel("X0")
 plt.ylabel("X1")
 noise_points = X[np.array(dbscan_labels) == -1]
