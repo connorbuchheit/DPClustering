@@ -56,10 +56,9 @@ def test_clusters(X, k, b, epsilon, max_iter, plot=True, true_labels=None, silen
     # epsilon-dp dbscan clustering
     # ==================================
 
-    # intermediate processing
+    # pre-processing
     dp_dbscan_labels1 = dbscan.add_noise_to_neighbors(epsilon)
 
-    # pre-processing
     dbscan.X = noisy_data
     dp_dbscan_labels2 = dbscan.fit()
 
