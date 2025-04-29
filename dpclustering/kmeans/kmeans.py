@@ -19,6 +19,8 @@ class KMeans:
         self.tol = tol
         self.centroids = None
 
+        self.n_points = X.shape[0]
+
     def fit(self):
         n_samples, _ = self.X.shape
         random_indices = np.random.choice(n_samples, self.k, replace=False)
@@ -44,11 +46,11 @@ class KMeans:
         self.labels = labels
         return self.centroids, self.labels
     
-    def add_noise_to_centroids(self, epsilon):
+    def add_noise_to_centroids(self, epsilon, release_labels=True):
         """
         Finds the centroids of each cluster, adds Laplace noise to them, then
-        reassigns the labels of the data points to the noisy centroids. Must
-        have called fit() first, which computes the centroids.
+        reassigns the labels of the data points to the noisy centroids, if 
+        requested. Must have called fit() first, which computes the centroids.
 
         Parameters:
         epsilon (float): The privacy budget for differential privacy.
@@ -57,24 +59,40 @@ class KMeans:
         noisy_centroids (numpy.ndarray): The noisy centroids after adding noise.
         labels (numpy.ndarray): The labels of the data points after reassigning to noisy centroids.
         """
-        if self.centroids is None or self.labels is None:
+        if self.centroids is None or (self.labels is None and release_labels):
             raise ValueError("Centroids have not been computed. Call fit() first.")
 
-        noisy_centroids = np.zeros_like(self.centroids)
-        for i in range(self.k):
-            cluster_size = np.sum(self.labels == i)
-            if cluster_size > 0:
-                epsilon_per_centroid = epsilon / self.k
-                sensitivity = 2 * self.b / cluster_size
-                noise = np.random.laplace(0, sensitivity / epsilon_per_centroid, self.centroids[i].shape)
-                noisy_centroids[i] = self.centroids[i] + noise
-            else:
-                noisy_centroids[i] = self.centroids[i]
+        if release_labels:
+            centroid_epsilon = epsilon / 10
+            label_epsilon = epsilon - centroid_epsilon
+        else:
+            centroid_epsilon = epsilon
+        
+        cluster_sizes = np.array([np.sum(self.labels == i) for i in range(self.k)])
+        sensitivity = 2 * self.b / cluster_sizes
+        scales = sensitivity / centroid_epsilon
 
-        # reassign labels based on noisy centroids
-        distances = np.linalg.norm(self.X[:, np.newaxis] - noisy_centroids, axis=2)
-        self.labels = np.argmin(distances, axis=1)
+        noise = np.random.laplace(0, scales[:, np.newaxis], size=self.centroids.shape)
+        noisy_centroids = self.centroids + noise
 
-        return noisy_centroids, self.labels
+        # reassign labels using exponential function
+        if release_labels:
+            sensitivity = 2 * self.b 
+
+            labels = np.zeros(self.n_points, dtype=int)
+            for i in range(self.n_points):
+                utilities = -np.linalg.norm(noisy_centroids - self.X[i], axis=1)
+                scores = np.exp((label_epsilon * utilities) / sensitivity)
+                probs = scores / np.sum(scores)
+                labels[i] = np.random.choice(self.k, p=probs)
+            
+            self.labels = labels
+
+        # reassign labels using private distance
+        # distances = np.linalg.norm(self.X[:, np.newaxis] - noisy_centroids, axis=2)
+        # labels = np.argmin(distances, axis=1)
+
+        
+        return noisy_centroids, labels if release_labels else noisy_centroids
         
         

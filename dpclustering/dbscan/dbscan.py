@@ -170,7 +170,7 @@ class DBSCAN:
     #             count += 1
     #     return count
     
-    def _generate_noisy_neighbors(self, epsilon):
+    def _generate_noisy_neighbors(self, epsilon, delta=1e-5, print_accuracy=False):
         """
         Generate a noisy binary neighbor matrix using randomized response.
         
@@ -180,25 +180,55 @@ class DBSCAN:
         Returns:
         numpy.ndarray: The noisy binary neighbor matrix.
         """
-        def compute_p(epsilon):
-            if epsilon > 20:
-                print(f"[WARNING] Epsilon (ε = {epsilon}) is too large for randomized response. Defaulting to 1.0.")
-                return 1.0
-            else:
-                return np.exp(epsilon) / (1 + np.exp(epsilon))
+        # def compute_p(epsilon):
+        #     if epsilon > 20:
+        #         print(f"[WARNING] Epsilon (ε = {epsilon}) is too large for randomized response. Defaulting to 1.0.")
+        #         return 1.0
+        #     else:
+        #         return np.exp(epsilon) / (1 + np.exp(epsilon))
         
-        p = compute_p(epsilon)
+        # num_pairs = self.n_points * (self.n_points - 1) // 2
+        # p = compute_p(epsilon / num_pairs)
 
-        neighbor_matrix = np.zeros((self.n_points, self.n_points), dtype=int)
+        # neighbor_matrix = np.zeros((self.n_points, self.n_points), dtype=int)
+        # for i in range(self.n_points):
+        #     for j in range(self.n_points):
+        #         dist = self._euclidean_distance(i, j)
+        #         true_neighbor = 1 if dist <= self.radius else 0
+
+        #         flip = np.random.rand() < p
+        #         noisy_neighbor = true_neighbor if flip else 1 - true_neighbor
+
+        #         neighbor_matrix[i, j] = noisy_neighbor
+        #         neighbor_matrix[j, i] = noisy_neighbor  # for symmetry
+
+        # return neighbor_matrix
+
+        true_matrix = np.zeros((self.n_points, self.n_points), dtype=int)
         for i in range(self.n_points):
             for j in range(self.n_points):
                 dist = self._euclidean_distance(i, j)
-                true_neighbor = 1 if dist <= self.radius else 0
+                true_matrix[i, j] = 1 if dist <= self.radius else 0
+                true_matrix[j, i] = true_matrix[i, j]
 
-                flip = np.random.rand() < p
-                noisy_neighbor = true_neighbor if flip else 1 - true_neighbor
+        sensitivity = np.sqrt(2 * (self.n_points - 1))
+        sigma = np.sqrt(2 * np.log(1.25 / delta)) * sensitivity / epsilon
 
-                neighbor_matrix[i, j] = noisy_neighbor
-                neighbor_matrix[j, i] = noisy_neighbor  # for symmetry
+        noise = np.random.normal(loc=0, scale=sigma, size=true_matrix.shape)
+        noisy = true_matrix.astype(float) + noise
+        neighbor_matrix = (noisy > 0.5).astype(int)
+
+        if print_accuracy:
+            n = true_matrix.shape[0]
+
+            # create a mask for i<j (upper triangle, excluding diagonal)
+            mask = np.triu(np.ones((n, n), dtype=bool), k=1)
+
+            # count matches only where i<j
+            matches = (neighbor_matrix[mask] == true_matrix[mask]).sum()
+            total_pairs = mask.sum()
+
+            accuracy = matches / total_pairs * 100
+            print(f"Neighbor‐matrix accuracy: {accuracy:.2f}%")
 
         return neighbor_matrix
