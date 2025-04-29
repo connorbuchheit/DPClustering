@@ -1,3 +1,8 @@
+# appends parent directory to access dpclustering folder
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import dpclustering as dpc
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,14 +26,6 @@ def test_kmeans():
     kmeans.X = noisy_data
     dp_centroids2, dp_labels2 = kmeans.fit()
 
-    # print("Original Centroids:\n", centroids)
-    # print("DP Centroids (add_noise_to_centroids):\n", dp_centroids1)
-    # print("DP Centroids (add_noise_to_data):\n", dp_centroids2)
-
-    # print("Original Labels:", labels)
-    # print("Labels (add_noise_to_centroids):", dp_labels1)
-    # print("Labels (add_noise_to_data):", dp_labels2)
-
     from sklearn.metrics import adjusted_rand_score
     print("ARI (add_noise_to_centroids):", adjusted_rand_score(labels, dp_labels1))
     print("ARI (add_noise_to_data):", adjusted_rand_score(labels, dp_labels2))
@@ -49,11 +46,6 @@ def test_dbscan():
     noisy_data = dpc.data.add_noise_to_data(data, epsilon, sensitivity=1, b=b)
     dbscan.X = noisy_data
     dp_labels3 = dbscan.fit()
-
-    # print("Original Labels:", labels)
-    # print("Labels (add_noise_to_densities):", dp_labels1)
-    # print("Labels (add_noise_to_distances):", dp_labels2)
-    # print("Labels (add_noise_to_data):", dp_labels3)
 
     from sklearn.metrics import adjusted_rand_score
 
