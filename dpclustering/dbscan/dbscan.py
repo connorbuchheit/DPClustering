@@ -1,7 +1,7 @@
 import numpy as np
 
 class DBSCAN:
-    def __init__(self, X, b, radius, min_samples, max_iter=100):
+    def __init__(self, X, b, radius, min_samples, max_iter=2000):
         """
         Initialize the DBSCAN clustering algorithm.
 
@@ -20,29 +20,31 @@ class DBSCAN:
 
         self.n_points = X.shape[0]
         
-    def fit(self, distance_func=None, density_func=None):
+    def fit(self, neighbor_matrix=None):
         """
         Perform DBSCAN clustering.
 
         Parameters:
-            distance_func (callable, optional): Function to compute distance between two points.
-            density_func (callable, optional): Function to compute density based on neighbors.
+        neighbor_matrix (numpy.ndarray): Optional precomputed privatized neighbor matrix. Defaults to Euclidean distance.
 
         Returns:
             list: Cluster labels for each point (-1 for noise).
         """
-        if distance_func is None:
-            distance_func = self._euclidean_distance
-        if density_func is None:
-            density_func = self._default_density
-
-        def region_query(point_idx):
-            """Find all neighbors within radius distance of a point."""
-            neighbors = []
-            for idx, point in enumerate(self.X):
-                if distance_func(self.X[point_idx], point) <= self.radius:
-                    neighbors.append(idx)
-            return neighbors
+        if neighbor_matrix is None:
+            # Standard DBSCAN with Euclidean distance
+            def region_query(point_idx):
+                neighbors = []
+                for idx in range(self.n_points):
+                    if self._euclidean_distance(point_idx, idx) <= self.radius:
+                        neighbors.append(idx)
+                return neighbors
+        else:
+            def region_query(point_idx):
+                neighbors = []
+                for idx in range(self.n_points):
+                    if neighbor_matrix[point_idx, idx] == 1:
+                        neighbors.append(idx)
+                return neighbors
 
         def expand_cluster(point_idx, neighbors, cluster_id):
             """Expand the cluster recursively."""
@@ -50,119 +52,152 @@ class DBSCAN:
             i = 0
             while i < len(neighbors):
                 neighbor_idx = neighbors[i]
-                if clusters[neighbor_idx] == -1:  # Previously marked as noise
+                if clusters[neighbor_idx] == -1:
                     clusters[neighbor_idx] = cluster_id
-                elif clusters[neighbor_idx] == 0:  # Not yet visited
+                elif clusters[neighbor_idx] == 0:
                     clusters[neighbor_idx] = cluster_id
                     new_neighbors = region_query(neighbor_idx)
-                    if density_func(new_neighbors) >= self.min_samples / (np.pi * self.radius**2):
-                        neighbors += new_neighbors
+                    if len(new_neighbors) >= self.min_samples:
+                        neighbors += [n for n in new_neighbors if n not in neighbors]
                 i += 1
 
         # Initialize cluster labels (0 = unvisited, -1 = noise)
-        clusters = [0] * len(self.X)
+        clusters = [0] * self.n_points
         cluster_id = 0
 
         # Iterate through each point
-        for point_idx in range(len(self.X)):
+        for point_idx in range(self.n_points):
             if clusters[point_idx] != 0:
                 continue
             neighbors = region_query(point_idx)
-            if density_func(neighbors) < self.min_samples / (np.pi * self.radius**2):
-                clusters[point_idx] = -1  # Mark as noise
+            if len(neighbors) < self.min_samples:
+                clusters[point_idx] = -1
             else:
                 cluster_id += 1
                 expand_cluster(point_idx, neighbors, cluster_id)
 
         self.labels_ = clusters
-        return clusters  
+        return clusters 
 
-    def add_noise_to_densities(self, epsilon):
-        """
-        Adds Laplace noise to the density of each point in the dataset.
+    # def add_noise_to_densities(self, epsilon):
+    #     """
+    #     Adds Laplace noise to the density of each point in the dataset. Also 
+    #     adds noise to the distances between points, because the density is 
+    #     computed based on distances, which means a non-DP protected distance
+    #     function would leak information about the data. Splits the budget
+    #     equally between the two functions.
 
-        Parameters:
-        epsilon (float): The privacy budget for differential privacy.
+    #     Parameters:
+    #     epsilon (float): The privacy budget for differential privacy.
 
-        Returns:
-        labels (numpy.ndarray): The labels of the data points after adding noise to densities.
-        """
-        epsilon_per_point = epsilon / self.n_points
-        return self.fit(density_func=self._dp_density(epsilon=epsilon_per_point))
+    #     Returns:
+    #     labels (numpy.ndarray): The labels of the data points after adding noise to densities.
+    #     """
+    #     half_epsilon = epsilon / 2
+    #     sensitivity = 1
+
+    #     dp_distance_func, distance_matrix = self._generate_noisy_distances(half_epsilon)
+
+    #     densities = np.zeros(self.n_points)
+    #     for i in range(self.n_points):
+    #         for j in range(self.n_points):
+    #             if distance_matrix[i, j] <= self.radius:
+    #                 densities[i] += 1
+
+    #     noise = np.random.laplace(0, sensitivity / half_epsilon, self.n_points)
+    #     noisy_densities = densities + noise
+
+    #     def dp_density(i):
+    #         return noisy_densities[i]
+
+    #     return self.fit(distance_func=dp_distance_func, density_func=dp_density)
     
-    def add_noise_to_distances(self, epsilon):
+    # def add_noise_to_distances(self, epsilon):
+    #     """
+    #     Adds Laplace noise to the distances between points in the dataset.
+    #     Vectorizes the distance function to simulate a single query.
+
+    #     Parameters:
+    #     epsilon (float): The privacy budget for differential privacy.
+
+    #     Returns:
+    #     labels (numpy.ndarray): The labels of the data points after adding noise to distances.
+    #     """
+    #     dp_distance, _ = self._generate_noisy_distances(epsilon)
+
+    #     return self.fit(distance_func=dp_distance)
+
+    def add_noise_to_neighbors(self, epsilon):
         """
-        Adds Laplace noise to the distances between points in the dataset.
+        Uses randomized response to add noise to the neighbors of each point in the dataset.
 
         Parameters:
         epsilon (float): The privacy budget for differential privacy.
 
         Returns:
-        labels (numpy.ndarray): The labels of the data points after adding noise to distances.
+        list: Cluster labels for each point (-1 for noise).
         """
-        epsilon_per_point = epsilon / self.n_points
-        return self.fit(distance_func=self._dp_distance(epsilon=epsilon_per_point))
+        neighbor_matrix = self._generate_noisy_neighbors(epsilon)
+        return self.fit(neighbor_matrix)
 
-    def _euclidean_distance(self, point1, point2):
+    def _euclidean_distance(self, i, j):
         """
         Compute the Euclidean distance between two points.
 
         Parameters:
-        point1 (numpy.ndarray): The first point.
-        point2 (numpy.ndarray): The second point.
+        i (int): The index of the first point.
+        j (int): The index of the second point.
 
         Returns:
         float: The Euclidean distance between the two points.
         """
-        return np.linalg.norm(point1 - point2)
+        return np.linalg.norm(self.X[i] - self.X[j])
 
-    def _default_density(self, neighbors):
-        """
-        Compute the density of a point based on its neighbors.
+    # def _default_density(self, point_idx):
+    #     """
+    #     Compute the density of a point by counting the number of data points 
+    #     within the radius.
 
-        Parameters:
-        point (numpy.ndarray): The point for which to compute density.
-        neighbors (list): The list of neighboring points.
+    #     Parameters:
+    #     point_idx (int): The point index for which to compute density.
 
-        Returns:
-        float: The density of the point.
-        """
-        return len(neighbors) / (np.pi * (self.radius ** 2))
+    #     Returns:
+    #     int: The number of points within the radius of the point.
+    #     """
+    #     count = 0
+    #     for j in range(self.n_points):
+    #         if self._euclidean_distance(point_idx, j) <= self.radius:
+    #             count += 1
+    #     return count
     
-    def _dp_distance(self, epsilon):
+    def _generate_noisy_neighbors(self, epsilon):
         """
-        Compute the distance between two points with differential privacy.
-
-        Parameters:
-        point1 (numpy.ndarray): The first point.
-        point2 (numpy.ndarray): The second point.
-        epsilon (float): The privacy budget for differential privacy.
-
-        Returns:
-        float: The distance between the two points with added noise.
-        """
-        def dp_distance_aux(point1, point2):
-            distance = self._euclidean_distance(point1, point2)
-            sensitivity = 2 * self.b  # diameter of the bounding box [-b, b]
-            noise = np.random.laplace(0, sensitivity/epsilon)
-            return distance + noise
+        Generate a noisy binary neighbor matrix using randomized response.
         
-        return dp_distance_aux
-    
-    def _dp_density(self, epsilon):
-        """
-        Compute the density of a point based on its neighbors with differential privacy.
-
         Parameters:
-        neighbors (numpy.ndarray): The list of neighboring points.
         epsilon (float): The privacy budget for differential privacy.
-
+        
         Returns:
-        float: The density of the point with added noise.
+        numpy.ndarray: The noisy binary neighbor matrix.
         """
-        def dp_density_aux(neighbors):
-            density = len(neighbors) / (np.pi * (self.radius ** 2))
-            sensitivity = 1 / (np.pi * (self.radius ** 2))
-            noise = np.random.laplace(0, sensitivity/epsilon)
-            return density + noise
-        return dp_density_aux
+        def compute_p(epsilon):
+            if epsilon > 20:
+                return 1.0
+            else:
+                return np.exp(epsilon) / (1 + np.exp(epsilon))
+        
+        p = compute_p(epsilon)
+
+        neighbor_matrix = np.zeros((self.n_points, self.n_points), dtype=int)
+        for i in range(self.n_points):
+            for j in range(self.n_points):
+                dist = self._euclidean_distance(i, j)
+                true_neighbor = 1 if dist <= self.radius else 0
+
+                flip = np.random.rand() < p
+                noisy_neighbor = true_neighbor if flip else 1 - true_neighbor
+
+                neighbor_matrix[i, j] = noisy_neighbor
+                neighbor_matrix[j, i] = noisy_neighbor  # for symmetry
+                
+        return neighbor_matrix

@@ -89,7 +89,6 @@ class Data:
         dim=2, 
         cluster_std=0.5, 
         separation=5,
-        cluster_type='spherical'
     ):
         """
         Generates synthetic clusters of data points.
@@ -100,38 +99,20 @@ class Data:
         dim (int): Number of dimensions for each point.
         cluster_std (float): Standard deviation of the clusters.
         separation (float): Minimum distance between cluster centers.
-        cluster_type (str): Type of cluster ('spherical', 'elliptical', 'bridged', 'isolated').
 
         Returns:
-        numpy.ndarray: The generated data points.
+        tuple:
+            - numpy.ndarray: The generated data points.
+            - numpy.ndarray: Corresponding labels for each data point.
         """
         X = []
+        y = []
         for i in range(n_clusters):
             center = np.random.uniform(-separation, separation, size=(dim,))
-
-            if cluster_type == 'spherical':
-                cluster_points = np.random.randn(points_per_cluster, dim) * cluster_std + center
-            elif cluster_type == 'elliptical':
-                cov = np.diag(np.random.uniform(0.5, 2.0, size=(dim,)))
-                cluster_points = np.random.multivariate_normal(center, cov, size=points_per_cluster)
-            elif cluster_type == 'bridged':
-                if i == 0:
-                    center_start = center
-                    cluster_points = np.random.randn(points_per_cluster, dim) * cluster_std + center_start
-                else:
-                    center_end = center
-                    bridge_points = np.linspace(center_start, center_end, points_per_cluster)
-                    noise = np.random.randn(points_per_cluster, dim) * (cluster_std * 0.3)
-                    cluster_points = bridge_points + noise
-                    center_start = center_end
-            elif cluster_type == 'isolated':
-                cluster_points = np.random.randn(points_per_cluster, dim) * (cluster_std * 0.2) + center
-            else:
-                raise ValueError("Unsupported cluster type. Use 'spherical', 'elliptical', 'bridged', or 'isolated'.")
-            
+            cluster_points = np.random.randn(points_per_cluster, dim) * cluster_std + center
             X.append(cluster_points)
-        return np.vstack(X)
-
+            y.append(np.full(points_per_cluster, i))
+        return np.vstack(X), np.concatenate(y)
     
     @staticmethod
     def plot_clusters(X, labels, title="Clusters", cmap='tab10', dims=2, show=True):
