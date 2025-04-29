@@ -182,6 +182,7 @@ class DBSCAN:
         """
         def compute_p(epsilon):
             if epsilon > 20:
+                print(f"[WARNING] Epsilon (ε = {epsilon}) is too large for randomized response. Defaulting to 1.0.")
                 return 1.0
             else:
                 return np.exp(epsilon) / (1 + np.exp(epsilon))
@@ -199,5 +200,5 @@ class DBSCAN:
 
                 neighbor_matrix[i, j] = noisy_neighbor
                 neighbor_matrix[j, i] = noisy_neighbor  # for symmetry
-                
+
         return neighbor_matrix
