@@ -19,12 +19,15 @@ class KMeans:
         self.tol = tol
         self.centroids = None
 
-        self.n_points = X.shape[0]
+        self.n_points, self.dims = X.shape
+        
 
-    def fit(self):
-        n_samples, _ = self.X.shape
-        random_indices = np.random.choice(n_samples, self.k, replace=False)
-        centroids = self.X[random_indices]
+    def fit(self, init_centroids=None):
+        if init_centroids is None:
+            random_indices = np.random.choice(self.n_points, self.k, replace=False)
+            centroids = self.X[random_indices]
+        else:
+            centroids = init_centroids
 
         for _ in range(self.max_iter):
             # Compute distances from samples to centroids
@@ -94,7 +97,41 @@ class KMeans:
 
         
         return noisy_centroids, labels if release_labels else noisy_centroids
-        
+    
+    def private_kmeanspp(self, epsilon):
+        """
+        An implementation of the Private KMeans++ algorithm.
+
+        Parameters:
+        epsilon (float): The privacy budget for differential privacy.
+
+        Returns:
+        """
+        sensitivity_u = 4 * np.power(self.b, 2) * self.dims
+
+        epsilon_per_step = epsilon / (self.k - 1)
+        centroids = []
+
+        # select a random point as the first centroid
+        first_idx = np.random.choice(self.n_points)
+        centroids.append(self.X[first_idx])
+
+        for i in range(1, self.k):
+            # utility function is the distance to the nearest centroid
+            distances = np.array([
+                min(np.sum((x - c) ** 2) for c in centroids) for x in self.X
+            ])
+
+            # sample the next centroid using the exponential mechanism
+            scores = distances
+            exp_scores = np.exp((epsilon_per_step / (2 * sensitivity_u)) * scores)
+            probs = exp_scores / np.sum(exp_scores)
+
+            new_idx = np.random.choice(self.n_points, p=probs)
+            centroids.append(self.X[new_idx])
+
+        return self.fit(np.array(centroids))
+
     def predict(self, x):
         """
         Predict the cluster for a new data point.

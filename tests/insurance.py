@@ -13,7 +13,7 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 
 import dpclustering as dpc
 
-EPSILON = 1.0 # for DBSCAN to work, this should be ~11. Epsilon must be set <=20.
+EPSILON = 10 # Epsilon must be set <=20.
 SEED = None
 DIMS = 2
 
@@ -47,14 +47,12 @@ dp_kmeans = dpc.kmeans.KMeans(X_scaled, k=4, b=3, max_iter=2000)
 dp_kmeans.fit()
 dp_centroids, dp_kmeans_labels = dp_kmeans.add_noise_to_centroids(epsilon=EPSILON)
 
+pkpp_centroids, pkpp_labels = dp_kmeans.private_kmeanspp(epsilon=EPSILON)
+
 dp_dbscan = dpc.dbscan.DBSCAN(X_scaled, radius=3, min_samples=6, b=3, max_iter=2000)
 dp_dbscan_labels = dp_dbscan.add_noise_to_neighbors(epsilon=EPSILON)
 
-def clip_rows(X, clip_norm):
-    norms = np.linalg.norm(X, axis=1, keepdims=True)
-    scaling = np.minimum(1, clip_norm / norms)
-    return X * scaling
-X_scaled_clipped = clip_rows(X_scaled, clip_norm=3)
+X_scaled_clipped = dpc.data.clip_rows(X_scaled, b=3)
 X_scaled_noisy = dpc.data.add_noise_to_data(X_scaled, epsilon=EPSILON, sensitivity=1, b=3)
 dpdata_kmeans_labels = kmeans.fit_predict(X_scaled_noisy)
 
@@ -63,20 +61,24 @@ dpdata_dbscan_labels = dbscan.fit_predict(X_scaled_noisy)
 
 ari_kmeans        = ari(kmeans_labels, dp_kmeans_labels)
 ari_dpdata_kmeans = ari(kmeans_labels, dpdata_kmeans_labels)
+ari_pkpp          = ari(kmeans_labels, pkpp_labels)
 ari_dbscan        = ari(dbscan_labels, dp_dbscan_labels)
 ari_dpdata_dbscan = ari(dbscan_labels, dpdata_dbscan_labels)
 nmi_kmeans        = nmi(kmeans_labels, dp_kmeans_labels)
 nmi_dpdata_kmeans = nmi(kmeans_labels, dpdata_kmeans_labels)
+nmi_pkpp          = nmi(kmeans_labels, pkpp_labels)
 nmi_dbscan        = nmi(dbscan_labels, dp_dbscan_labels)
 nmi_dpdata_dbscan = nmi(dbscan_labels, dpdata_dbscan_labels)
 
 print("Epsilon =", EPSILON)
 print(f"ARI between KMeans and DPC KMeans: {ari_kmeans:.4f}")
 print(f"ARI between DBSCAN and DPC DBSCAN: {ari_dbscan:.4f}")
+print(f"ARI between KMeans and Private KMeans++: {ari_pkpp:.4f}")
 print(f"ARI between KMeans and KMeans (noisy data): {ari_dpdata_kmeans:.4f}")
 print(f"ARI between DBSCAN and DBSCAN (noisy data): {ari_dpdata_dbscan:.4f}")
 print(f"NMI between KMeans and DPC KMeans: {nmi_kmeans:.4f}")
 print(f"NMI between DBSCAN and DPC DBSCAN: {nmi_dbscan:.4f}")
+print(f"NMI between KMeans and Private KMeans++: {nmi_pkpp:.4f}")
 print(f"NMI between KMeans and KMeans (noisy data): {nmi_dpdata_kmeans:.4f}")
 print(f"NMI between DBSCAN and DBSCAN (noisy data): {nmi_dpdata_dbscan:.4f}")
 
@@ -84,6 +86,7 @@ dpc.data.plot_clusters(X_low_dim, kmeans_labels, "Standard KMeans", dims=DIMS)
 dpc.data.plot_clusters(X_low_dim, dbscan_labels, "Standard DBSCAN", dims=DIMS)
 dpc.data.plot_clusters(X_low_dim, dp_kmeans_labels, f"DPC KMeans (epsilon={EPSILON})", dims=DIMS)
 dpc.data.plot_clusters(X_low_dim, dp_dbscan_labels, f"DPC DBSCAN (epsilon={EPSILON})", dims=DIMS)
+dpc.data.plot_clusters(X_low_dim, pkpp_labels, f"Private KMeans++ (epsilon={EPSILON})", dims=DIMS)
 dpc.data.plot_clusters(X_low_dim, dpdata_kmeans_labels, f"KMeans (noisy data, epsilon={EPSILON})", dims=DIMS)
 dpc.data.plot_clusters(X_low_dim, dpdata_dbscan_labels, f"DBSCAN (noisy data, epsilon={EPSILON})", dims=DIMS)
 

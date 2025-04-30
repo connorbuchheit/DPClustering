@@ -146,3 +146,18 @@ class Data:
         
         if show:
             plt.show()
+
+    @staticmethod
+    def clip_rows(X, b):
+        """
+        Clips the rows of the data points to be within the bounds [-b, b].
+
+        Parameters:
+        X (numpy.ndarray): The data points to clip.
+        b (float): The bounds for clipping the data points.
+
+        Returns:
+        numpy.ndarray: The clipped data points.
+        """
+        return np.clip(X, -b, b)
+        
