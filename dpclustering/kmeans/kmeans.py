@@ -95,4 +95,19 @@ class KMeans:
         
         return noisy_centroids, labels if release_labels else noisy_centroids
         
+    def predict(self, x):
+        """
+        Predict the cluster for a new data point.
+
+        Parameters:
+        x (numpy.ndarray): The new data point to predict.
+
+        Returns:
+        int: The predicted cluster label.
+        """
+        if self.centroids is None:
+            raise ValueError("Centroids have not been computed. Call fit() first.")
+
+        distances = np.linalg.norm(self.centroids - x, axis=1)
+        return np.argmin(distances)
         

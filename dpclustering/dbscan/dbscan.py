@@ -127,9 +127,9 @@ class DBSCAN:
 
     #     return self.fit(distance_func=dp_distance)
 
-    def add_noise_to_neighbors(self, epsilon):
+    def add_noise_to_neighbors(self, epsilon, delta=1e-5):
         """
-        Uses randomized response to add noise to the neighbors of each point in the dataset.
+        Uses Gaussian Noise to add noise to the neighbors of each point in the dataset.
 
         Parameters:
         epsilon (float): The privacy budget for differential privacy.
@@ -137,7 +137,7 @@ class DBSCAN:
         Returns:
         list: Cluster labels for each point (-1 for noise).
         """
-        neighbor_matrix = self._generate_noisy_neighbors(epsilon)
+        neighbor_matrix = self._generate_noisy_neighbors(epsilon, delta)
         return self.fit(neighbor_matrix)
 
     def _euclidean_distance(self, i, j):
@@ -170,9 +170,9 @@ class DBSCAN:
     #             count += 1
     #     return count
     
-    def _generate_noisy_neighbors(self, epsilon, delta=1e-5, print_accuracy=False):
+    def _generate_noisy_neighbors(self, epsilon, delta, print_accuracy=False):
         """
-        Generate a noisy binary neighbor matrix using randomized response.
+        Generate a noisy binary neighbor matrix.
         
         Parameters:
         epsilon (float): The privacy budget for differential privacy.
