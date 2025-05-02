@@ -60,7 +60,7 @@ plt.subplot(1, 3, 2)
 plt.scatter(X[:, 0], X[:, 1], c=dp_labels_noisy_centroids, cmap=cmap, s=point_size, alpha=alpha_val) # Use updated size/alpha
 plt.scatter(dp_centroids_noisy[:, 0], dp_centroids_noisy[:, 1],
             marker='P', s=150, c='black', edgecolors='white', linewidth=1,
-            label=f'DP Centroids ($\epsilon$={EPSILON})')
+            label=rf'DP Centroids ($\epsilon$={EPSILON})')
 plt.title("Add Noise to Centroids")
 plt.xlabel("X0")
 plt.ylabel("X1")
@@ -72,7 +72,7 @@ plt.gca().set_aspect('equal', adjustable='box')
 # c. original data labeled by clustering noisy data
 plt.subplot(1, 3, 3)
 plt.scatter(X[:, 0], X[:, 1], c=labels_from_noisy_data, cmap=cmap, s=point_size, alpha=alpha_val)
-plt.title(f"Original Data Labeled via Noisy Data ($\epsilon$={EPSILON})")
+plt.title(rf"Original Data Labeled via Noisy Data ($\epsilon$={EPSILON})")
 plt.xlabel("X0")
 plt.ylabel("X1")
 plt.xlim(plot_lim_x_bounded)
