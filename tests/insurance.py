@@ -10,10 +10,11 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import adjusted_rand_score as ari
 from sklearn.metrics import normalized_mutual_info_score as nmi
+import seaborn as sns
 
 import dpclustering as dpc
 
-EPSILON = 10
+EPSILON = 20
 B = 3 # clipping
 
 K = 4 # Number of clusters (for k-means)
@@ -54,18 +55,71 @@ def main():
 
     normalized_distances(np_km_centroids, [{"Noisy Centroids K-Means": dpc_km_centroids}, {"Private K-Means": dpc_km_centroids2}, {"Noisy Data K-Means": dpdata_km_centroids}])
 
-    dpc.data.plot_clusters(X_low_dim, np_km_labels, title=f"Non-private KMeans (epsilon = {EPSILON})", dims=DIMS)
-    dpc.data.plot_clusters(X_low_dim, np_db_labels, title=f"Non-private DBSCAN (epsilon = {EPSILON})", dims=DIMS)
+    dpc.data.plot_clusters(X_low_dim, np_km_labels, title=f"Non-private KMeans", dims=DIMS)
+    dpc.data.plot_clusters(X_low_dim, np_db_labels, title=f"Non-private DBSCAN", dims=DIMS)
     dpc.data.plot_clusters(X_low_dim, dpc_db_labels, title=f"DP DBSCAN (epsilon = {EPSILON})", dims=DIMS)
     dpc.data.plot_clusters(X_low_dim, dpdata_km_labels, title=f"KMeans (noisy data, epsilon = {EPSILON})", dims=DIMS)
     dpc.data.plot_clusters(X_low_dim, dpdata_db_labels, title=f"DBSCAN (noisy data, epsilon = {EPSILON})", dims=DIMS)
-    dpc.data.plot_clusters(X_low_dim, dpc_km_labels2, title=f"Private KMeans (epsilon = {EPSILON})", dims=DIMS)
+    dpc.data.plot_clusters(X_low_dim, dpc_km_labels2, title=f"Private KMeans (epsilon = {EPSILON}, delta = {DELTA})", dims=DIMS)
 
 
+def boxwhiskers():
+    EPSILONS = [0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
+    NUM_TRIALS = 10
+
+    ari_results = {algo: {eps: [] for eps in EPSILONS} for algo in ["Noisy Centroids KMeans", "Private KMeans", "Noisy Data KMeans"]}
+    nmi_results = {algo: {eps: [] for eps in EPSILONS} for algo in ["Noisy Centroids KMeans", "Private KMeans", "Noisy Data KMeans"]}
+
+    for eps in EPSILONS:
+        for _ in range(NUM_TRIALS):
+            X = np.clip(scale_data(insurance_to_numpy()), -B, B)
+            X_noisy = noise_data(X, eps, sensitivity=2 * B, b=B)
+
+            np_km_centroids, np_km_labels = non_private_kmeans(X, K)
+
+            dpc_km_centroids, dpc_km_labels = dpc_dp_kmeans(X, K, B, eps)
+            dpc_km_centroids2, dpc_km_labels2 = dpc_private_kmeans(X, K, B, eps, DELTA, PHI2)
+            dpdata_km_centroids, dpdata_km_labels = dpc_dp_kmeans(X_noisy, K, B, eps)
+
+            # ARI/NMI scores
+            ari_results["Noisy Centroids KMeans"][eps].append(ari(np_km_labels, dpc_km_labels))
+            ari_results["Private KMeans"][eps].append(ari(np_km_labels, dpc_km_labels2))
+            ari_results["Noisy Data KMeans"][eps].append(ari(np_km_labels, dpdata_km_labels))
+
+            nmi_results["Noisy Centroids KMeans"][eps].append(nmi(np_km_labels, dpc_km_labels))
+            nmi_results["Private KMeans"][eps].append(nmi(np_km_labels, dpc_km_labels2))
+            nmi_results["Noisy Data KMeans"][eps].append(nmi(np_km_labels, dpdata_km_labels))
 
 
+    def flatten_results(results_dict, metric_name):
+        records = []
+        for algo, eps_dict in results_dict.items():
+            for eps, scores in eps_dict.items():
+                for score in scores:
+                    records.append({
+                        "Epsilon": eps,
+                        "Algorithm": algo,
+                        metric_name: score
+                    })
+        return pd.DataFrame(records)
 
+    # Create DataFrames
+    df_ari = flatten_results(ari_results, "ARI")
+    df_nmi = flatten_results(nmi_results, "NMI")
 
+    # Plot ARI boxplot
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x="Epsilon", y="ARI", hue="Algorithm", data=df_ari)
+    plt.title("ARI Distribution by Epsilon and Algorithm")
+    plt.legend(title="Algorithm", loc="best")
+    plt.show()
+
+    # Plot NMI boxplot
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x="Epsilon", y="NMI", hue="Algorithm", data=df_nmi)
+    plt.title("NMI Distribution by Epsilon and Algorithm")
+    plt.legend(title="Algorithm", loc="best")
+    plt.show()
 
 
 
@@ -139,4 +193,5 @@ def nmi_scores(true_labels, dpc_labels_dict_list):
             score = nmi(true_labels, value)
             print(f"NMI between true labels and {key}: {score:.4f}")
 
-main()
+# main()
+boxwhiskers()
