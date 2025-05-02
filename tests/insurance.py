@@ -47,9 +47,9 @@ def main():
 
     print(f"EPSILON = {EPSILON}")
 
-    ari_scores(np_km_labels, [{"Noisy Centroids K-Means": dpc_km_labels}, {"Private K-Means:": dpc_km_labels2}, {"Noisy Data K-Means:": dpdata_km_labels}])
+    ari_scores(np_km_labels, [{"Noisy Centroids K-Means": dpc_km_labels}, {"Private K-Means": dpc_km_labels2}, {"Noisy Data K-Means": dpdata_km_labels}])
     ari_scores(np_db_labels, [{"DPC DBSCAN": dpc_db_labels}, {"Noisy Data DBSCAN": dpdata_db_labels}])
-    nmi_scores(np_km_labels, [{"Noisy Centroids K-Means": dpc_km_labels}, {"Private K-Means:": dpc_km_labels2}, {"Noisy Data K-Means:": dpdata_km_labels}])
+    nmi_scores(np_km_labels, [{"Noisy Centroids K-Means": dpc_km_labels}, {"Private K-Means": dpc_km_labels2}, {"Noisy Data K-Means": dpdata_km_labels}])
     nmi_scores(np_db_labels, [{"DPC DBSCAN": dpc_db_labels}, {"Noisy Data DBSCAN": dpdata_db_labels}])
 
     normalized_distances(np_km_centroids, [{"Noisy Centroids K-Means": dpc_km_centroids}, {"Private K-Means": dpc_km_centroids2}, {"Noisy Data K-Means": dpdata_km_centroids}])
