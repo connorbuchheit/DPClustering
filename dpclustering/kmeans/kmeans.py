@@ -86,10 +86,19 @@ class KMeans:
     
     def private_kmeans(self, epsilon, delta, phi2):
         """
-        An implementation of the private KMeans algorithm.
+        An implementation of the private KMeans algorithm. Additionally, it
+        reassigns the labels of the data points to the noisy centroids using a
+        helper function.
         Source: Algorithm 1 in https://dl.acm.org/doi/pdf/10.1145/3196959.3196977
 
+        Parameters:
+        epsilon (float): The privacy budget for differential privacy.
+        delta (float): The probability of failure.
+        phi2 (float): Separation parameter. Said to be <= 1/1000.
 
+        Returns:
+        noisy_centroids (numpy.ndarray): The noisy centroids after adding noise.
+        labels (numpy.ndarray): The labels of the data points after reassigning to noisy centroids.
         """
         from sklearn.cluster import KMeans
 
