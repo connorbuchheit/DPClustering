@@ -13,80 +13,130 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 
 import dpclustering as dpc
 
-EPSILON = 10 # Epsilon must be set <=20.
-SEED = None
-DIMS = 2
+EPSILON = 10
+B = 3 # clipping
+
+K = 4 # Number of clusters (for k-means)
+RADIUS = 3 # (for DBSCAN)
+MIN_SAMPLES = 6 # (for DBSCAN)
+MAX_ITER = 2000 
+
+DELTA = 1e-5 # Used for any approx-DP algorithms
+PHI2 = 1/1000 # Used only for private k-means. phi^2 must be set <=1/1000
+
+DIMS = 2 # number of dimensions to plot graph
+SEED = None 
 
 np.random.seed(SEED)
 
-df = dpc.data.load_csv("csv/insurance.csv")
-print("Number of rows:", df.shape[0])
+def main():
+    X = np.clip(scale_data(insurance_to_numpy()), -B, B)
+    X_noisy = noise_data(X, EPSILON, sensitivity=2 * B, b=B)
+    X_low_dim = reduce_dimensions(X, DIMS)
 
-df["sex"] = df["sex"].map({"male": 0, "female": 1})
-df["smoker"] = df["smoker"].map({"yes": 1, "no": 0})
+    np_km_centroids, np_km_labels = non_private_kmeans(X, K)
+    np_db_labels = non_private_dbscan(X, radius=3, min_samples=6)
 
-region_encoded = pd.get_dummies(df["region"], prefix="region")
-df = pd.concat([df.drop("region", axis=1), region_encoded], axis=1)
+    dpc_km_centroids, dpc_km_labels = dpc_dp_kmeans(X, K, B, EPSILON)
+    dpc_km_centroids2, dpc_km_labels2 = dpc_private_kmeans(X, K, B, EPSILON, DELTA, PHI2)
 
-features = ["age", 'sex', 'bmi', 'children', 'smoker'] + list(region_encoded.columns)
-X = df[features].values
+    dpc_db_labels = dpc_dp_dbscan(X, radius=RADIUS, min_samples=MIN_SAMPLES, b=B, epsilon=EPSILON)
 
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+    dpdata_km_centroids, dpdata_km_labels = dpc_dp_kmeans(X_noisy, K, B, EPSILON)
+    dpdata_db_labels = dpc_dp_dbscan(X_noisy, radius=RADIUS, min_samples=MIN_SAMPLES, b=B, epsilon=EPSILON)
 
-pca = PCA(n_components=DIMS)
-X_low_dim = pca.fit_transform(X_scaled)
+    print(f"EPSILON = {EPSILON}")
 
-kmeans = KMeans(n_clusters=4)
-kmeans_labels = kmeans.fit_predict(X_scaled)
+    ari_scores(np_km_labels, [{"Noisy Centroids K-Means": dpc_km_labels}, {"Private K-Means:": dpc_km_labels2}, {"Noisy Data K-Means:": dpdata_km_labels}])
+    ari_scores(np_db_labels, [{"DPC DBSCAN": dpc_db_labels}, {"Noisy Data DBSCAN": dpdata_db_labels}])
+    nmi_scores(np_km_labels, [{"Noisy Centroids K-Means": dpc_km_labels}, {"Private K-Means:": dpc_km_labels2}, {"Noisy Data K-Means:": dpdata_km_labels}])
+    nmi_scores(np_db_labels, [{"DPC DBSCAN": dpc_db_labels}, {"Noisy Data DBSCAN": dpdata_db_labels}])
 
-dbscan = DBSCAN(eps=3, min_samples=6)
-dbscan_labels = dbscan.fit_predict(X_scaled)
+    normalized_distances(np_km_centroids, [{"Noisy Centroids K-Means": dpc_km_centroids}, {"Private K-Means": dpc_km_centroids2}, {"Noisy Data K-Means": dpdata_km_centroids}])
 
-dp_kmeans = dpc.kmeans.KMeans(X_scaled, k=4, b=3, max_iter=2000)
-dp_kmeans.fit()
-dp_centroids, dp_kmeans_labels = dp_kmeans.add_noise_to_centroids(epsilon=EPSILON)
+    dpc.data.plot_clusters(X_low_dim, np_km_labels, title=f"Non-private KMeans (epsilon = {EPSILON})", dims=DIMS)
+    dpc.data.plot_clusters(X_low_dim, np_db_labels, title=f"Non-private DBSCAN (epsilon = {EPSILON})", dims=DIMS)
+    dpc.data.plot_clusters(X_low_dim, dpc_db_labels, title=f"DP DBSCAN (epsilon = {EPSILON})", dims=DIMS)
+    dpc.data.plot_clusters(X_low_dim, dpdata_km_labels, title=f"KMeans (noisy data, epsilon = {EPSILON})", dims=DIMS)
+    dpc.data.plot_clusters(X_low_dim, dpdata_db_labels, title=f"DBSCAN (noisy data, epsilon = {EPSILON})", dims=DIMS)
+    dpc.data.plot_clusters(X_low_dim, dpc_km_labels2, title=f"Private KMeans (epsilon = {EPSILON})", dims=DIMS)
 
-pkm_centroids, pkm_labels = dp_kmeans.private_kmeans(epsilon=EPSILON, delta=1e-5, phi2=1/1000)
 
-dp_dbscan = dpc.dbscan.DBSCAN(X_scaled, radius=3, min_samples=6, b=3, max_iter=2000)
-dp_dbscan_labels = dp_dbscan.add_noise_to_neighbors(epsilon=EPSILON)
 
-X_scaled_clipped = dpc.data.clip_rows(X_scaled, b=3)
-X_scaled_noisy = dpc.data.add_noise_to_data(X_scaled, epsilon=EPSILON, sensitivity=1, b=3)
-dpdata_kmeans_labels = kmeans.fit_predict(X_scaled_noisy)
 
-dp_dbscan.X = X_scaled_noisy
-dpdata_dbscan_labels = dbscan.fit_predict(X_scaled_noisy)
 
-ari_kmeans        = ari(kmeans_labels, dp_kmeans_labels)
-ari_dpdata_kmeans = ari(kmeans_labels, dpdata_kmeans_labels)
-ari_pkm           = ari(kmeans_labels, pkm_labels)
-ari_dbscan        = ari(dbscan_labels, dp_dbscan_labels)
-ari_dpdata_dbscan = ari(dbscan_labels, dpdata_dbscan_labels)
-nmi_kmeans        = nmi(kmeans_labels, dp_kmeans_labels)
-nmi_dpdata_kmeans = nmi(kmeans_labels, dpdata_kmeans_labels)
-nmi_pkm           = nmi(kmeans_labels, pkm_labels)
-nmi_dbscan        = nmi(dbscan_labels, dp_dbscan_labels)
-nmi_dpdata_dbscan = nmi(dbscan_labels, dpdata_dbscan_labels)
 
-print("Epsilon =", EPSILON)
-print(f"ARI between KMeans and DPC KMeans: {ari_kmeans:.4f}")
-print(f"ARI between DBSCAN and DPC DBSCAN: {ari_dbscan:.4f}")
-print(f"ARI between KMeans and Private KMeans: {ari_pkm:.4f}")
-print(f"ARI between KMeans and KMeans (noisy data): {ari_dpdata_kmeans:.4f}")
-print(f"ARI between DBSCAN and DBSCAN (noisy data): {ari_dpdata_dbscan:.4f}")
-print(f"NMI between KMeans and DPC KMeans: {nmi_kmeans:.4f}")
-print(f"NMI between DBSCAN and DPC DBSCAN: {nmi_dbscan:.4f}")
-print(f"NMI between KMeans and Private KMeans: {nmi_pkm:.4f}")
-print(f"NMI between KMeans and KMeans (noisy data): {nmi_dpdata_kmeans:.4f}")
-print(f"NMI between DBSCAN and DBSCAN (noisy data): {nmi_dpdata_dbscan:.4f}")
 
-dpc.data.plot_clusters(X_low_dim, kmeans_labels, "Standard KMeans", dims=DIMS)
-dpc.data.plot_clusters(X_low_dim, dbscan_labels, "Standard DBSCAN", dims=DIMS)
-dpc.data.plot_clusters(X_low_dim, dp_kmeans_labels, f"DPC KMeans (epsilon={EPSILON})", dims=DIMS)
-dpc.data.plot_clusters(X_low_dim, dp_dbscan_labels, f"DPC DBSCAN (epsilon={EPSILON})", dims=DIMS)
-dpc.data.plot_clusters(X_low_dim, pkm_labels, f"Private KMeans (epsilon={EPSILON})", dims=DIMS)
-dpc.data.plot_clusters(X_low_dim, dpdata_kmeans_labels, f"KMeans (noisy data, epsilon={EPSILON})", dims=DIMS)
-dpc.data.plot_clusters(X_low_dim, dpdata_dbscan_labels, f"DBSCAN (noisy data, epsilon={EPSILON})", dims=DIMS)
 
+
+def insurance_to_numpy():
+    df = dpc.data.load_csv("csv/insurance.csv")
+
+    df["sex"] = df["sex"].map({"male": 0, "female": 1})
+    df["smoker"] = df["smoker"].map({"yes": 1, "no": 0})
+
+    region_encoded = pd.get_dummies(df["region"], prefix="region")
+    df = pd.concat([df.drop("region", axis=1), region_encoded], axis=1)
+
+    features = ["age", 'sex', 'bmi', 'children', 'smoker'] + list(region_encoded.columns)
+    return df[features].values
+
+def scale_data(X):
+    scaler = StandardScaler()
+    return scaler.fit_transform(X)
+
+def reduce_dimensions(X, dims):
+    pca = PCA(n_components=dims)
+    return pca.fit_transform(X)
+
+def noise_data(X, epsilon, sensitivity, b):
+    return dpc.data.add_noise_to_data(X, epsilon, sensitivity=sensitivity, b=b)
+
+def non_private_kmeans(X, k):
+    kmeans = KMeans(n_clusters=k)
+    labels = kmeans.fit_predict(X)
+    centroids = kmeans.cluster_centers_
+    return centroids, labels
+
+def non_private_dbscan(X, radius, min_samples):
+    dbscan = DBSCAN(eps=radius, min_samples=min_samples)
+    labels = dbscan.fit_predict(X)
+    return labels
+
+def dpc_dp_kmeans(X, k, b, epsilon):
+    dp_kmeans = dpc.kmeans.KMeans(X, k=k, b=b, max_iter=2000)
+    dp_kmeans.fit()
+    return dp_kmeans.add_noise_to_centroids(epsilon=epsilon)
+
+def dpc_private_kmeans(X, k, b, epsilon, delta, phi2):
+    dp_kmeans = dpc.kmeans.KMeans(X, k=k, b=b, max_iter=2000)
+    return dp_kmeans.private_kmeans(epsilon=epsilon, delta=delta, phi2=phi2)
+
+def dpc_dp_dbscan(X, radius, min_samples, b, epsilon):
+    dp_dbscan = dpc.dbscan.DBSCAN(X, radius=radius, min_samples=min_samples, b=b, max_iter=2000)
+    return dp_dbscan.add_noise_to_neighbors(epsilon=epsilon)
+
+def normalized_distance(c1, c2):
+    distance = np.linalg.norm(c1 - c2)
+    max_distance = 2 * B * np.sqrt(DIMS)
+    return distance / max_distance
+
+def normalized_distances(c1, c2_dict_list):
+    for c2 in c2_dict_list:
+        for key, value in c2.items():
+            distance = normalized_distance(c1, value)
+            print(f"Normalized distance between centroids and {key}: {distance:.4f}")
+
+def ari_scores(true_labels, dpc_labels_dict_list):
+    for dpc_labels in dpc_labels_dict_list:
+        for key, value in dpc_labels.items():
+            score = ari(true_labels, value)
+            print(f"ARI between true labels and {key}: {score:.4f}")
+
+def nmi_scores(true_labels, dpc_labels_dict_list):
+    for dpc_labels in dpc_labels_dict_list:
+        for key, value in dpc_labels.items():
+            score = nmi(true_labels, value)
+            print(f"NMI between true labels and {key}: {score:.4f}")
+
+main()
