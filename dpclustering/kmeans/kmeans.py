@@ -80,57 +80,67 @@ class KMeans:
 
         # reassign labels using exponential function
         if release_labels:
-            sensitivity = 2 * self.b 
-
-            labels = np.zeros(self.n_points, dtype=int)
-            for i in range(self.n_points):
-                utilities = -np.linalg.norm(noisy_centroids - self.X[i], axis=1)
-                scores = np.exp((label_epsilon * utilities) / sensitivity)
-                probs = scores / np.sum(scores)
-                labels[i] = np.random.choice(self.k, p=probs)
-            
-            self.labels = labels
-
-        # reassign labels using private distance
-        # distances = np.linalg.norm(self.X[:, np.newaxis] - noisy_centroids, axis=2)
-        # labels = np.argmin(distances, axis=1)
-
+            labels = self._assign_labels(noisy_centroids, label_epsilon)
         
         return noisy_centroids, labels if release_labels else noisy_centroids
     
-    def private_kmeanspp(self, epsilon):
+    def private_kmeans(self, epsilon, delta, phi2):
         """
-        An implementation of the Private KMeans++ algorithm.
+        An implementation of the private KMeans algorithm.
+        Source: Algorithm 1 in https://dl.acm.org/doi/pdf/10.1145/3196959.3196977
+
+
+        """
+        from sklearn.cluster import KMeans
+
+        epsilon_centroids = epsilon / 10
+        epsilon_assignment = epsilon - epsilon_centroids
+
+        epsilon_prime = epsilon / (8 * self.k * np.sqrt(self.k * np.log(1 / delta)))
+        delta_prime = delta / (8 * self.k**2)
+
+        t = int(np.ceil(self.k * np.power(self.n_points, 1/10) * \
+                        np.power(self.dims, 1/2) / epsilon_prime))
+        t = min(t, self.n_points // self.k)
+        subsets = np.array_split(self.X, t)
+
+        subset_centroids = []
+        for subset in subsets:
+            km = KMeans(n_clusters=self.k, max_iter=1000, n_init=1)
+            km.fit(subset)
+            subset_centroids.append(km.cluster_centers_)
+        subset_centroids = np.array(subset_centroids)
+
+        aligned_centers = np.mean(subset_centroids, axis=0)
+
+        sensitivity = phi2
+        noise_scale = sensitivity * np.sqrt(2 * np.log(1.25 / delta_prime)) / epsilon_centroids
+        noisy_centroids = aligned_centers + np.random.laplace(0, noise_scale, size=aligned_centers.shape)
+
+        return noisy_centroids, self._assign_labels(noisy_centroids, epsilon_assignment)
+        
+    def _assign_labels(self, centroids, epsilon):
+        """
+        Assigns labels using the exponential mechanism. Assumes data ∈ [-b, b]^N.
 
         Parameters:
+        centroids (numpy.ndarray): The centroids of the clusters (noisy OK).
         epsilon (float): The privacy budget for differential privacy.
 
         Returns:
+        labels (numpy.ndarray): The labels of the data points after reassigning to noisy centroids.
         """
-        sensitivity_u = 4 * np.power(self.b, 2) * self.dims
+        distances = np.linalg.norm(self.X[:, np.newaxis] - centroids, axis=2)
+        sensitivity = 2 * self.b * np.sqrt(self.dims)  # 2b√d
+        scale = epsilon / (2 * sensitivity)
 
-        epsilon_per_step = epsilon / (self.k - 1)
-        centroids = []
+        scores = -distances
+        max_scores = np.max(scale * scores, axis=1, keepdims=True)
+        probabilities = np.exp(scale * scores - max_scores) # numerical stability
+        probabilities /= probabilities.sum(axis=1, keepdims=True)
 
-        # select a random point as the first centroid
-        first_idx = np.random.choice(self.n_points)
-        centroids.append(self.X[first_idx])
-
-        for i in range(1, self.k):
-            # utility function is the distance to the nearest centroid
-            distances = np.array([
-                min(np.sum((x - c) ** 2) for c in centroids) for x in self.X
-            ])
-
-            # sample the next centroid using the exponential mechanism
-            scores = distances
-            exp_scores = np.exp((epsilon_per_step / (2 * sensitivity_u)) * scores)
-            probs = exp_scores / np.sum(exp_scores)
-
-            new_idx = np.random.choice(self.n_points, p=probs)
-            centroids.append(self.X[new_idx])
-
-        return self.fit(np.array(centroids))
+        labels = np.array([np.random.choice(self.k, p=prob) for prob in probabilities])
+        return labels
 
     def predict(self, x):
         """
@@ -148,3 +158,5 @@ class KMeans:
         distances = np.linalg.norm(self.centroids - x, axis=1)
         return np.argmin(distances)
         
+    
+    
