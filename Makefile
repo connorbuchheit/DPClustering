@@ -1,21 +1,13 @@
 .PHONY: all test run-main run-insurance-plots run-prediction-example
 
-# Default target
+
 all: test
-
-# Run general tests and experiments
 test:
-	PYTHONPATH=. python tests/_.py
-	PYTHONPATH=. python tests/experiments.py
-
-# Run the main synthetic data example
+	PYTHONWARNINGS=ignore PYTHONPATH=. python tests/_.py
+	PYTHONWARNINGS=ignore PYTHONPATH=. python tests/experiments.py
 run-main:
-	PYTHONPATH=. python main.py
-
-# Run insurance-specific experiments and generate plots (like in the report)
+	PYTHONWARNINGS=ignore PYTHONPATH=. python main.py
 run-insurance-plots:
-	PYTHONPATH=. python tests/insurance.py
-
-# Run the insurance prediction example
+	PYTHONWARNINGS=ignore PYTHONPATH=. python tests/insurance.py
 run-prediction-example:
-	PYTHONPATH=. python tests/predict_insurance.py
+	PYTHONWARNINGS=ignore PYTHONPATH=. python tests/predict_insurance.py
