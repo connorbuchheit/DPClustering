@@ -1,6 +1,5 @@
 .PHONY: all test run-main run-insurance-plots run-prediction-example
 
-
 all: test
 test:
 	PYTHONWARNINGS=ignore PYTHONPATH=. python tests/_.py

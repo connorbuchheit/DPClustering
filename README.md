@@ -2,7 +2,7 @@
 
 This project investigates the application of differential privacy (DP) to common clustering algorithms, specifically k-means and DBSCAN.
 
-### 1. Overview
+## 1. Overview
 
 Our primary goal is to explore the tradeoffs between data privacy and clustering utility (accuracy, interpretability, structure). We aim to understand:
 
@@ -10,7 +10,7 @@ Our primary goal is to explore the tradeoffs between data privacy and clustering
 2. Whether certain algorithm types (centroid-based vs. density-based) are inherently more robust or suitable for DP.
 3. The impact of applying DP noise at different stages of the clustering process *(eg., input data, and intermediate calculations like centroids/densities)*.
 
-### 2. Implementation Status
+## 2. Implementation Status
 
 | Feature                   | Description                                                                                                                    |
 |---------------------------|--------------------------------------------------------------------------------------------------------------------------------|
