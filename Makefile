@@ -1,3 +1,3 @@
 .PHONY: test
 test:
-	PYTHONPATH=. python tests/test.py
+	PYTHONPATH=. python tests/_.py

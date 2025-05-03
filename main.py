@@ -12,7 +12,7 @@ SEPARATION = 5
 EPSILON = 0.1
 DATA_BOUND_B = 8.0
 
-X = generate_clusters(
+X, _ = generate_clusters(
     n_clusters=N_CLUSTERS,
     points_per_cluster=POINTS_PER_CLUSTER,
     dim=DIM,
