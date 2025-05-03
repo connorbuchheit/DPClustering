@@ -17,56 +17,58 @@ Our primary goal is to explore the tradeoffs between data privacy and clustering
 | Baseline Implementations  | Non-private versions of k-means (`k_means.py`) and DBSCAN (`dbscan.py`) implemented from scratch                              |
 | Synthetic Data Generation | Utility function (`generate_data.py`) to create simple clustered datasets for testing                                          |
 | Basic Visualization       | `main.py` script generates synthetic data, runs both non-private algorithms, and visualizes results using Matplotlib           |
+| DP Mechanisms             | Implementations for adding noise to data, centroids (k-means), and neighbor checks (DBSCAN)                                    |
+| Evaluation Scripts        | Scripts in `tests/` for running experiments on synthetic and real (insurance) data, calculating metrics (ARI, NMI), and plotting |
 
-### 3. Usage
+## 3. Usage
 
-To run the current non-private implementations and see the visualization:
+To run the various scripts and experiments in this project:
 
-1. clone the repository
-2. install the required packages
-3. run the main script:
+1. *clone the repository:*
 
-```bash
-pip install -r requirements.txt
-python main.py
-```
+    ```bash
+    git clone https://github.com/connorbuchheit/DPClustering
+    cd ./DPClustering
+    ```
 
-*this will generate synthetic data, run k-means and DBSCAN, and display a plot comparing their outputs.*
+2. *install required packages:*
 
-### 4. Tests
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-To run the clustering tests located in the `tests/` folder, use the provided `Makefile`:
+3. *use the Makefile targets:* The `Makefile` provides convenient commands to run different parts of the project. The `PYTHONPATH` is set automatically. (you will get an error if you try to run the scripts directly without the Makefile, but if you set the PYTHONPATH manually it should also work, we do recommend the Makefile however!)
+
+### (a) Run general tests and experiments (default)
 
 ```bash
 make test
+# or simply:
+make
 ```
 
-This sets the `PYTHONPATH` automatically. Alternatively, you can still run:
+This executes `tests/_.py` (runs algorithms on insurance data, prints metrics) and `tests/experiments.py` (runs algorithms on various synthetic datasets, generates plots).
+
+### (b) Run the main synthetic data example
 
 ```bash
-python tests/test.py
+make run-main
 ```
 
-But ensure you have set the `PYTHONPATH` correctly to include the current directory, or you will encounter a `ModuleNotFoundError`:
+This executes `main.py`.
 
-#### Common Error
-
-If you encounter the following:
+### (c) Run insurance-specific experiments and generate plots
 
 ```bash
-python tests/test.py
-Traceback (most recent call last):
-  File "/Users/bqr/class/208/DPClustering/tests/test.py", line 1, in <module>
-    import dpclustering as dpc
-ModuleNotFoundError: No module named 'dpclustering'
+make run-insurance-plots
 ```
 
-You would need to set the `PYTHONPATH` to the current directory so Python can find the `dpclustering` module. A simple way to do this is by running:
+This executes `tests/insurance.py`, which runs experiments specifically on the insurance dataset and generates comparison plots (like those potentially used in the report).
+
+### (d) Run the insurance prediction example:
 
 ```bash
-export PYTHONPATH=$PWD #this initialises a new environment variable $PYTHONPATH, and gives it value of the current working directory ($PWD == print working directory)
-
-python tests/test.py
---------------------------
-ARI (add_noise_to_densi...
+make run-prediction-example
 ```
+
+This executes `tests/predict_insurance.py` to demonstrate predicting cluster/cost for a single predefined person.

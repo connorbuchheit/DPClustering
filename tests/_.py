@@ -19,7 +19,7 @@ DIMS = 2
 
 np.random.seed(SEED)
 
-df = dpc.data.load_csv("csv/insurance.csv")
+df = dpc.data.load_csv("tests/csv/insurance.csv")
 print("Number of rows:", df.shape[0])
 
 df["sex"] = df["sex"].map({"male": 0, "female": 1})

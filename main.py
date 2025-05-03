@@ -23,7 +23,6 @@ X = np.clip(X, -DATA_BOUND_B, DATA_BOUND_B)
 
 # algorithms
 # a. original K-Means (non-DP)
-# instantiate and fit k-means
 kmeans = KMeans(X, N_CLUSTERS, DATA_BOUND_B)
 original_centroids, original_labels = kmeans.fit()
 

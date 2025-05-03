@@ -124,7 +124,7 @@ def boxwhiskers():
 
 
 def insurance_to_numpy():
-    df = dpc.data.load_csv("csv/insurance.csv")
+    df = dpc.data.load_csv("tests/csv/insurance.csv")
 
     df["sex"] = df["sex"].map({"male": 0, "female": 1})
     df["smoker"] = df["smoker"].map({"yes": 1, "no": 0})
