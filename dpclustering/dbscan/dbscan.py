@@ -79,53 +79,6 @@ class DBSCAN:
         self.labels_ = clusters
         return clusters 
 
-    # def add_noise_to_densities(self, epsilon):
-    #     """
-    #     Adds Laplace noise to the density of each point in the dataset. Also 
-    #     adds noise to the distances between points, because the density is 
-    #     computed based on distances, which means a non-DP protected distance
-    #     function would leak information about the data. Splits the budget
-    #     equally between the two functions.
-
-    #     Parameters:
-    #     epsilon (float): The privacy budget for differential privacy.
-
-    #     Returns:
-    #     labels (numpy.ndarray): The labels of the data points after adding noise to densities.
-    #     """
-    #     half_epsilon = epsilon / 2
-    #     sensitivity = 1
-
-    #     dp_distance_func, distance_matrix = self._generate_noisy_distances(half_epsilon)
-
-    #     densities = np.zeros(self.n_points)
-    #     for i in range(self.n_points):
-    #         for j in range(self.n_points):
-    #             if distance_matrix[i, j] <= self.radius:
-    #                 densities[i] += 1
-
-    #     noise = np.random.laplace(0, sensitivity / half_epsilon, self.n_points)
-    #     noisy_densities = densities + noise
-
-    #     def dp_density(i):
-    #         return noisy_densities[i]
-
-    #     return self.fit(distance_func=dp_distance_func, density_func=dp_density)
-    
-    # def add_noise_to_distances(self, epsilon):
-    #     """
-    #     Adds Laplace noise to the distances between points in the dataset.
-    #     Vectorizes the distance function to simulate a single query.
-
-    #     Parameters:
-    #     epsilon (float): The privacy budget for differential privacy.
-
-    #     Returns:
-    #     labels (numpy.ndarray): The labels of the data points after adding noise to distances.
-    #     """
-    #     dp_distance, _ = self._generate_noisy_distances(epsilon)
-
-    #     return self.fit(distance_func=dp_distance)
 
     def add_noise_to_neighbors(self, epsilon, delta=1e-5):
         """
