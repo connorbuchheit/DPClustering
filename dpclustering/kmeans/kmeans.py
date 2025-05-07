@@ -59,7 +59,7 @@ class KMeans:
         self.labels = labels
         return self.centroids, self.labels
     
-    def balcanetal_fit(self, epsilon, X=None):
+    def balcanetal_fit(self, epsilon, T=3, X=None):
         """
         Performs KMeans clustering using the Balcan et al. method. Translated 
         code from MATLAB to Python.
@@ -83,11 +83,10 @@ class KMeans:
     
         mu_mean = np.mean(X, axis=1)
         for i in range(self.n):
-            tmpR = np.norm(X[:, i] - mu_mean)
+            tmpR = np.linalg.norm(X[:, i] - mu_mean)
             if tmpR > range_:
                 range_ = tmpR
 
-        T = 1
         results = [{} for _ in range(T)]
         loss_iter = np.zeros(T)
         epsilon = epsilon / T
@@ -99,7 +98,7 @@ class KMeans:
                 p = self.d
                 G_projection = np.eye(self.d)
             y_projected = G_projection @ X
-            c_candidates = self._candidate(X, side_length, p, 2 * epsilon / 3)
+            c_candidates = self._candidate(y_projected, side_length, p, 2 * epsilon / 3)
             print(f"Candidate set finished.")
             u_centers = self._localsearch(y_projected, c_candidates, range_, p, epsilon / 12)
             print(f"Local search finished.")
@@ -150,9 +149,14 @@ class KMeans:
             loss_iter[t] = totalloss
             print("Lloyd finished.")
 
-        prob = np.exp(-epsilon * loss_iter / 12)
+        scaled_losses = -epsilon * loss_iter / 12
+        max_val = np.max(scaled_losses)
+        prob = np.exp(scaled_losses - max_val)  # shift to avoid underflow
+        print("Probabilities:")
+        print(prob)
         prob = prob / np.sum(prob)
 
+        
         iter_selected = np.random.choice(len(prob), p=prob)
 
         z_centers = results[iter_selected]['z_centers']
@@ -172,7 +176,7 @@ class KMeans:
         T = 2
         candidates = []
 
-        newpart = self._partition(X, p, epsilon / T)
+        newpart = self._partition(X, side_length, p, epsilon / T)
         candidates.append(newpart)
 
         for t in range(T):
@@ -231,6 +235,8 @@ class KMeans:
                     else:
                         prob = 0.5 * np.exp(-epss * (activesize - gamma))
 
+                    prob = np.clip(prob, 0.0, 1.0)
+
                     if np.random.binomial(1, prob) > 0:
                         direction = numericmap[keyset[i]]
                         coordinate_shift = (side_length / 2) * direction.reshape(-1, 1)
@@ -276,8 +282,7 @@ class KMeans:
 
             raw_exp = np.exp(-epsilon * gains / (Lambda ** 2 * (T + 1)))
 
-            flat_idx = self._sample_discrete(raw_exp)
-            i, j = divmod(flat_idx, m)
+            i, j = self._sample_discrete(raw_exp)
 
             centerid[i] = j
 
@@ -324,7 +329,7 @@ class KMeans:
             signs = 2 * np.random.binomial(1, 0.5, size=(self.d, 1)) - 1
             noise = np.random.exponential(scale=noise_scale, size=(self.d, 1)) * signs
             z += noise
-        return z    
+        return z.flatten()
 
     def predict(self, x):
         """

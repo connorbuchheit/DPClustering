@@ -1,15 +1,13 @@
 from .kmeans import KMeans
 
 fit = KMeans.fit
-add_noise_to_centroids = KMeans.add_noise_to_centroids
 predict = KMeans.predict
-private_kmeans = KMeans.private_kmeans
+balcanetal_fit = KMeans.balcanetal_fit
 
 __all__ = [
     "fit",
-    "add_noise_to_centroids",
+    "balcanetal_fit",
     "predict",
-    "private_kmeans",
 ]
 
 

@@ -32,12 +32,32 @@ np.random.seed(SEED)
 
 def main():
     X = insurance_to_numpy()
+    noisy_X = dpc.data.add_noise_to_data(X, epsilon=EPSILON, sensitivity=2 * B, b=B)
+    noisy_X = np.clip(noisy_X, -B, B)
 
+    # True KMeans clustering
+    true_kmeans = KMeans(n_clusters=K, random_state=SEED)
+    true_kmeans.fit(X)
+    true_centroids = true_kmeans.cluster_centers_
+
+    # DPC KMeans clustering
+    dpc_kmeans = dpc.kmeans.KMeans(X, k=K, b=B, max_iter=MAX_ITER)
+    dpc_balcanetal_centroids = dpc_kmeans.balcanetal_fit(epsilon=EPSILON)
+    dpc_dpdata_centroids, _ = dpc_kmeans.fit(noisy_X)
+
+    # Losses
+    loss_true = quantization_loss(X, true_centroids)
+    loss_dpc_balcanetal = quantization_loss(X, dpc_balcanetal_centroids)
+    loss_dpc_dpdata = quantization_loss(X, dpc_dpdata_centroids)
+
+    print(f"True KMeans Loss: {loss_true:.4f}")
+    print(f"DPC KMeans Balcan et al Loss: {loss_dpc_balcanetal:.4f}")
+    print(f"DPC KMeans DPData Loss: {loss_dpc_dpdata:.4f}")
 
     
 
 def insurance_to_numpy():
-    df = dpc.data.load_csv("tests/csv/insurance.csv")
+    df = dpc.data.load_csv("csv/insurance.csv")
 
     df["sex"] = df["sex"].map({"male": 0, "female": 1})
     df["smoker"] = df["smoker"].map({"yes": 1, "no": 0})
@@ -61,3 +81,5 @@ def quantization_loss(X, centers):
     dists = np.linalg.norm(X[:, np.newaxis, :] - centers[np.newaxis, :, :], axis=2)
     min_sq_dists = np.min(dists **2, axis=1)
     return np.mean(min_sq_dists)
+
+main()
