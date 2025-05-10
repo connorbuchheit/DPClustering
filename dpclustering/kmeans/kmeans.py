@@ -59,7 +59,7 @@ class KMeans:
         self.labels = labels
         return self.centroids, self.labels
     
-    def balcanetal_fit(self, epsilon, T=3, X=None):
+    def balcanetal_fit(self, epsilon, T=3, X=None, silent=True):
         """
         Performs KMeans clustering using the Balcan et al. method. Translated 
         code from MATLAB to Python.
@@ -68,7 +68,9 @@ class KMeans:
 
         Parameters:
         epsilon (float): The privacy parameter.
+        T (int): The number of rounds for the algorithm.
         X (numpy.ndarray): The input X for clustering. If None, uses the initialized X.
+        silent (bool): If True, suppresses print statements.
         
         Returns:
         tuple: Centroids and labels for each point.
@@ -91,7 +93,8 @@ class KMeans:
         loss_iter = np.zeros(T)
         epsilon = epsilon / T
         for t in range(T):
-            print(f"Round: {t}")
+            if not silent:
+                print(f"Round: {t + 1}/{T}")
             p = int(np.floor(0.5 * np.log(self.n)))
             G_projection = np.random.normal(0, 1, (p, self.d)) / np.sqrt(p)
             if self.d <= 5:
@@ -99,9 +102,11 @@ class KMeans:
                 G_projection = np.eye(self.d)
             y_projected = G_projection @ X
             c_candidates = self._candidate(y_projected, side_length, p, 2 * epsilon / 3)
-            print(f"Candidate set finished.")
+            if not silent:
+                print(f"Candidate set finished.")
             u_centers = self._localsearch(y_projected, c_candidates, range_, p, epsilon / 12)
-            print(f"Local search finished.")
+            if not silent:
+                print(f"Local search finished.")
             clusters = [[] for _ in range(self.k)]
             for i in range(self.n):
                 minval = 1e100
@@ -119,7 +124,8 @@ class KMeans:
                 z_centers[:, j] = self._recover(X[:, clusters[j]], len(clusters[j]), range_, epsilon / 6)
                 diffs = X[:, clusters[j]] - z_centers[:, j].reshape(-1, 1)
                 totalloss += np.sum(diffs ** 2)
-            print("Starting Lloyd.")
+            if not silent:    
+                print("Starting Lloyd.")
             nLloyd = 3 # For Lloyd iteration
             for lloyditer in range(nLloyd):
                 clusters = [[] for _ in range(self.k)]
@@ -147,13 +153,15 @@ class KMeans:
                 'u_centers': u_centers,
             }
             loss_iter[t] = totalloss
-            print("Lloyd finished.")
+            if not silent:
+                print("Lloyd finished.")
 
         scaled_losses = -epsilon * loss_iter / 12
         max_val = np.max(scaled_losses)
         prob = np.exp(scaled_losses - max_val)  # shift to avoid underflow
-        print("Probabilities:")
-        print(prob)
+        if not silent:
+            print("Probabilities:")
+            print(prob)
         prob = prob / np.sum(prob)
 
         
@@ -168,7 +176,7 @@ class KMeans:
         # only care about the centers
         return z_centers.T
 
-    def _candidate(self, X, side_length, p, epsilon):
+    def _candidate(self, X, side_length, p, epsilon, silent=True):
         """
         A helper function to find candidate points for clustering. Used in the 
         Balcan et al. method. Code is translated from MATLAB to Python.
@@ -180,7 +188,8 @@ class KMeans:
         candidates.append(newpart)
 
         for t in range(T):
-            print(f"{t + 1}-th trial for a candidate set.")
+            if not silent:
+                print(f"{t + 1}-th trial for a candidate set.")
             offset = np.random.uniform(-side_length / 2, side_length / 2, size=(p, 1))
             shifted = X + offset @ np.ones((1, self.n))
             newpart = self._partition(shifted, side_length, p, epsilon / T)
@@ -251,7 +260,7 @@ class KMeans:
 
         return np.hstack(gridpoints)
     
-    def _localsearch(self, X, candidate, range_, p, epsilon):
+    def _localsearch(self, X, candidate, range_, p, epsilon, silent=True):
         """
         A helper function to perform local search for clustering. Used in the 
         Balcan et al. method. Code is translated from MATLAB to Python.
@@ -270,7 +279,8 @@ class KMeans:
         recordloss = np.zeros(T)
         loss = np.sum(np.min(weightmat[centerid, :], axis=0))
         for t in range(T):
-            print(f"{t + 1}-th iteration for local search.")
+            if not silent:
+                print(f"{t + 1}-th iteration for local search.")
             gains = np.zeros((self.k, m))
             for i in range(self.k):
                 for j in range(m):
@@ -330,21 +340,94 @@ class KMeans:
             noise = np.random.exponential(scale=noise_scale, size=(self.d, 1)) * signs
             z += noise
         return z.flatten()
+    
+    # def kaplan_stemmer_fit(self, epsilon, X=None):
+    #     """
+    #     Differentially Private k-means using Kaplan and Stemmer's algorithm.
+    #     Returns final private centers.
+    #     Paper: https://proceedings.neurips.cc/paper_files/paper/2018/file/32b991e5d77ad140559ffb95522992d0-Paper.pdf
+    #     """
+    #     if X is None:
+    #         X = self.X
+    #     unassigned = np.ones(self.n, dtype=bool)
+    #     all_candidates = []
+    #     eps_per_iter = epsilon / (2 * np.log2(np.log2(self.n)))
 
-    def predict(self, x):
-        """
-        Given a new sample x, predict the cluster it belongs to.
-        
-        Parameters:
-        x (numpy.ndarray): The input sample to predict the cluster for.
-        
-        Returns:
-        int: The predicted cluster label for the input sample.
-        """
-        if self.centroids is None:
-            raise ValueError("Model has not been fitted yet. Please call fit() before predict().")
+    #     for i in range(int(np.log2(np.log2(self.n))) + 1):
+    #         S_i = X[unassigned]
+    #         if len(S_i) == 0:
+    #             break
 
-        distances = np.linalg.norm(x - self.centroids, axis=1)
-        return np.argmin(distances)
+    #         centers_i = self._private_centers(S_i, eps_per_iter)
+    #         if len(centers_i) == 0:
+    #             continue
+    #         all_candidates.extend(centers_i)
 
+    #         # Assign any points close to new centers (Euclidean distance threshold)
+    #         dists = np.min([np.linalg.norm(X - c, axis=1) for c in centers_i], axis=0)
+    #         radius = 2 * self.b / (2 ** i)  # shrinking threshold
+    #         newly_covered = dists < radius
+    #         unassigned &= ~newly_covered
+
+    #     all_candidates = np.array(all_candidates)
+    #     self.centroids = self._select_k_private(all_candidates, epsilon / 2)
+    #     return self.centroids
+
+    # def _private_centers(self, X, epsilon):
+    #     """
+    #     Approximate private centers via LSH binning and noisy averaging.
+    #     """
+    #     n, d = X.shape
+    #     num_bins = min(int(np.sqrt(n)), 50)
+    #     random_vecs = np.random.randn(num_bins, d)
+    #     bin_ids = (X @ random_vecs.T) > 0  # shape: (n, num_bins)
+    #     bin_hashes = bin_ids.dot(1 << np.arange(num_bins))  # hash to int
+
+    #     bins = {}
+    #     for idx, h in enumerate(bin_hashes):
+    #         if h not in bins:
+    #             bins[h] = []
+    #         bins[h].append(X[idx])
+
+    #     centers = []
+    #     for pts in bins.values():
+    #         pts = np.array(pts)
+    #         if len(pts) < 2:
+    #             continue
+    #         avg = pts.mean(axis=0)
+    #         noise = np.random.laplace(0, self.b / (epsilon * len(pts)), size=self.d)
+    #         centers.append(avg + noise)
+
+    #     return centers
+
+    # def _select_k_private(self, candidates, epsilon):
+    #     """
+    #     Private selection of k centers using the exponential mechanism.
+    #     """
+    #     if len(candidates) < self.k:
+    #         raise ValueError("Not enough candidate centers to select k unique centers.")
+
+    #     n_subsets = 50  # number of candidate subsets to evaluate
+    #     subsets = []
+    #     scores = []
+
+    #     for _ in range(n_subsets):
+    #         subset_indices = np.random.choice(len(candidates), self.k, replace=False)
+    #         subset = candidates[subset_indices]
+    #         subsets.append(subset)
+
+
+    #         dists = [np.min(np.linalg.norm(self.X - c, axis=1)) ** 2 for c in subset]
+    #         score = -np.sum(dists)  
+    #         scores.append(score)
+
+    #     scores = np.array(scores)
+    #     scores -= np.max(scores)  # numerical stability
+
+    #     sensitivity = 2 * self.b**2
+    #     exp_scores = np.exp((epsilon * scores) / (2 * sensitivity))
+    #     probs = exp_scores / np.sum(exp_scores)
+
+    #     selected_idx = np.random.choice(len(subsets), p=probs)
+    #     return subsets[selected_idx]
     

@@ -39,17 +39,7 @@ To run the various scripts and experiments in this project:
 
 3. *use the Makefile targets:* The `Makefile` provides convenient commands to run different parts of the project. The `PYTHONPATH` is set automatically. (you will get an error if you try to run the scripts directly without the Makefile, but if you set the PYTHONPATH manually it should also work, we do recommend the Makefile however!)
 
-### (a) Run general tests and experiments (default)
-
-```bash
-make test
-# or simply:
-make
-```
-
-This executes `tests/_.py` (runs algorithms on insurance data, prints metrics) and `tests/experiments.py` (runs algorithms on various synthetic datasets, generates plots).
-
-### (b) Run the main synthetic data example
+### (a) Run the main synthetic data example
 
 ```bash
 make run-main
@@ -57,18 +47,10 @@ make run-main
 
 This executes `main.py`.
 
-### (c) Run insurance-specific experiments and generate plots
+### (b) Run insurance-specific experiments and generate plots
 
 ```bash
 make run-insurance-plots
 ```
 
 This executes `tests/insurance.py`, which runs experiments specifically on the insurance dataset and generates comparison plots (like those potentially used in the report).
-
-### (d) Run the insurance prediction example:
-
-```bash
-make run-prediction-example
-```
-
-This executes `tests/predict_insurance.py` to demonstrate predicting cluster/cost for a single predefined person.

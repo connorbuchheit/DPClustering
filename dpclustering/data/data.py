@@ -115,37 +115,77 @@ class Data:
         return np.vstack(X), np.concatenate(y)
     
     @staticmethod
-    def plot_clusters(X, labels, title="Clusters", cmap='tab10', dims=2, show=True):
+    def plot_clusters(X, labels, title="Clusters", cmap='tab10', dims=2, show=True, centers=None, ax=None):
         """
-        Plots the clusters in either 2D or 3D.
+        Plots the clusters in 2D or 3D with centers colored to match the clusters.
 
         Parameters:
-        X (numpy.ndarray): The data points to plot.
-        labels (numpy.ndarray): The cluster labels for each point.
-        title (str): The title of the plot.
-        cmap (str): The colormap to use for the clusters.
+        X (numpy.ndarray): Data points.
+        labels (numpy.ndarray): Cluster labels for each point.
+        title (str): Title of the plot.
+        cmap (str): Colormap name.
+        dims (int): 2 for 2D, 3 for 3D plot.
+        show (bool): Whether to show the plot immediately.
+        centers (numpy.ndarray): Coordinates of cluster centers.
+        ax (matplotlib.axes.Axes): Axes to plot on. If None, a new figure is created.
+        
+        Returns:
+        matplotlib.figure.Figure: The figure object.
         """
         import matplotlib.pyplot as plt
+        import numpy as np
+
+        unique_labels = np.unique(labels)
+        cmap_obj = plt.get_cmap(cmap)
+        color_map = {label: cmap_obj(i % cmap_obj.N) for i, label in enumerate(unique_labels)}
+        fig = None
 
         if dims == 2:
-            plt.scatter(X[:, 0], X[:, 1], c=labels, cmap=cmap, s=15)
-            plt.title(title)
-            plt.xlabel("X0")
-            plt.ylabel("X1")
+            if ax is None:
+                fig, ax = plt.subplots()
+            for label in unique_labels:
+                mask = labels == label
+                color = color_map[label]
+                ax.scatter(X[mask, 0], X[mask, 1], c=[color], s=15, label=f"Cluster {label}")
+
+                if centers is not None:
+                    ax.scatter(
+                        centers[label, 0], centers[label, 1],
+                        marker='o', c=[color], s=120,
+                        linewidths=3, edgecolors='black'
+                    )
+
+            ax.set_title(title)
+            ax.set_xlabel("X0")
+            ax.set_ylabel("X1")
+
         elif dims == 3:
             from mpl_toolkits.mplot3d import Axes3D
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
-            ax.scatter(X[:, 0], X[:, 1], X[:, 2], c=labels, cmap=cmap, s=15)
+            for label in unique_labels:
+                mask = labels == label
+                color = color_map[label]
+                ax.scatter(X[mask, 0], X[mask, 1], X[mask, 2], c=[color], s=15, label=f"Cluster {label}")
+
+                if centers is not None:
+                    ax.scatter(
+                        centers[label, 0], centers[label, 1], centers[label, 2],
+                        marker='o', c=[color], s=120, linewidths=3
+                    )
+
             ax.set_title(title)
             ax.set_xlabel("X0")
             ax.set_ylabel("X1")
             ax.set_zlabel("X2")
+
         else:
             raise ValueError("Only 2D and 3D plots are supported.")
-        
+
         if show:
             plt.show()
+
+        return fig
 
     @staticmethod
     def clip_rows(X, b):
@@ -160,4 +200,36 @@ class Data:
         numpy.ndarray: The clipped data points.
         """
         return np.clip(X, -b, b)
+    
+    @staticmethod
+    def quantization_loss(X, centroids):
+        """
+        Computes the quantization loss for a set of centroids.
+
+        Parameters:
+        X (numpy.ndarray): The original data points.
+        centroids (numpy.ndarray): The centroids to evaluate.
+
+        Returns:
+        float: The quantization loss.
+        """
+        distances = np.linalg.norm(X[:, np.newaxis] - centroids, axis=2)
+        min_distances = np.min(distances, axis=1)
+        return np.mean(min_distances**2)
+    
+    @staticmethod
+    def predict(X, NOI):
+        """
+        Predicts the cluster labels for the data points based on the neighbors
+        of interest (NOI), such as cluster centers or centroids.
         
+        Parameters:
+        X (numpy.ndarray): The data points to predict labels for.
+        NOI (numpy.ndarray): The neighbors of interest (e.g., cluster centers).
+
+        Returns:
+        numpy.ndarray: The predicted labels for each data point. 
+        """
+        distances = np.linalg.norm(X[:, np.newaxis] - NOI, axis=2)
+        labels = np.argmin(distances, axis=1)
+        return labels
