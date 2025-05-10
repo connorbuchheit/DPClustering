@@ -27,7 +27,7 @@ kmeans = KMeans(X, N_CLUSTERS, DATA_BOUND_B)
 original_centroids, original_labels = kmeans.fit()
 
 # b. DP K-Means --> add noise to centroids (output perturbation on centroids)
-dp_centroids_noisy, dp_labels_noisy_centroids = kmeans.add_noise_to_centroids(EPSILON)
+# dp_centroids_noisy, dp_labels_noisy_centroids = kmeans.add_noise_to_centroids(EPSILON)
 
 # c. DP --> input perturbation: add noise to data, then recluster
 noisy_X = add_noise_to_data(X, EPSILON, b=DATA_BOUND_B)

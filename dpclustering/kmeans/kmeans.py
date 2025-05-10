@@ -363,71 +363,77 @@ class KMeans:
     #             continue
     #         all_candidates.extend(centers_i)
 
-    #         # Assign any points close to new centers (Euclidean distance threshold)
-    #         dists = np.min([np.linalg.norm(X - c, axis=1) for c in centers_i], axis=0)
-    #         radius = 2 * self.b / (2 ** i)  # shrinking threshold
-    #         newly_covered = dists < radius
-    #         unassigned &= ~newly_covered
+    def kaplan_stemmer_fit(self, epsilon, delta=1e-5, beta=0.01):
+        """
+        Differentially Private k-means using Kaplan and Stemmer's algorithm.
+        Returns final private centers.
+        Paper: https://proceedings.neurips.cc/paper_files/paper/2018/file/32b991e5d77ad140559ffb95522992d0-Paper.pdf
+        """
+        X = self.X
+        unassigned = np.ones(self.n, dtype=bool)
+        all_candidates = []
+        eps_per_iter = epsilon / (2 * np.log2(np.log2(self.n)))
 
-    #     all_candidates = np.array(all_candidates)
-    #     self.centroids = self._select_k_private(all_candidates, epsilon / 2)
-    #     return self.centroids
+        for i in range(int(np.log2(np.log2(self.n))) + 1):
+            S_i = X[unassigned]
+            if len(S_i) == 0:
+                break
 
-    # def _private_centers(self, X, epsilon):
-    #     """
-    #     Approximate private centers via LSH binning and noisy averaging.
-    #     """
-    #     n, d = X.shape
-    #     num_bins = min(int(np.sqrt(n)), 50)
-    #     random_vecs = np.random.randn(num_bins, d)
-    #     bin_ids = (X @ random_vecs.T) > 0  # shape: (n, num_bins)
-    #     bin_hashes = bin_ids.dot(1 << np.arange(num_bins))  # hash to int
+            centers_i = self._private_centers(S_i, eps_per_iter)
+            all_candidates.extend(centers_i)
 
-    #     bins = {}
-    #     for idx, h in enumerate(bin_hashes):
-    #         if h not in bins:
-    #             bins[h] = []
-    #         bins[h].append(X[idx])
+            # Assign any points close to new centers (Euclidean distance threshold)
+            dists = np.min([np.linalg.norm(X - c, axis=1) for c in centers_i], axis=0)
+            radius = 2 * self.b / (2 ** i)  # shrinking threshold
+            newly_covered = dists < radius
+            unassigned &= ~newly_covered
 
-    #     centers = []
-    #     for pts in bins.values():
-    #         pts = np.array(pts)
-    #         if len(pts) < 2:
-    #             continue
-    #         avg = pts.mean(axis=0)
-    #         noise = np.random.laplace(0, self.b / (epsilon * len(pts)), size=self.d)
-    #         centers.append(avg + noise)
+        all_candidates = np.array(all_candidates)
+        self.centroids = self._select_k_private(all_candidates, epsilon / 2)
+        return self.centroids
 
-    #     return centers
+    def _private_centers(self, X, epsilon):
+        """
+        Approximate private centers via LSH binning and noisy averaging.
+        """
+        n, d = X.shape
+        num_bins = int(np.sqrt(n))
+        random_vecs = np.random.randn(num_bins, d)
+        bin_ids = (X @ random_vecs.T) > 0  # shape: (n, num_bins)
+        bin_hashes = bin_ids.dot(1 << np.arange(num_bins))  # hash to int
 
-    # def _select_k_private(self, candidates, epsilon):
-    #     """
-    #     Private selection of k centers using the exponential mechanism.
-    #     """
-    #     if len(candidates) < self.k:
-    #         raise ValueError("Not enough candidate centers to select k unique centers.")
+        bins = {}
+        for idx, h in enumerate(bin_hashes):
+            if h not in bins:
+                bins[h] = []
+            bins[h].append(X[idx])
 
-    #     n_subsets = 50  # number of candidate subsets to evaluate
-    #     subsets = []
-    #     scores = []
+        centers = []
+        for pts in bins.values():
+            pts = np.array(pts)
+            if len(pts) < 2:
+                continue
+            avg = pts.mean(axis=0)
+            noise = np.random.laplace(0, self.b / (epsilon * len(pts)), size=self.d)
+            centers.append(avg + noise)
 
-    #     for _ in range(n_subsets):
-    #         subset_indices = np.random.choice(len(candidates), self.k, replace=False)
-    #         subset = candidates[subset_indices]
-    #         subsets.append(subset)
+        return centers
 
+    def _select_k_private(self, candidates, epsilon):
+        """
+        Private selection of k centers using the exponential mechanism.
+        """
+        scores = []
+        for _ in range(len(candidates)):
+            subset = candidates[np.random.choice(len(candidates), self.k, replace=False)]
+            dist_sum = np.sum([np.min(np.linalg.norm(self.X - c, axis=1)) ** 2 for c in subset])
+            scores.append(-dist_sum)
 
-    #         dists = [np.min(np.linalg.norm(self.X - c, axis=1)) ** 2 for c in subset]
-    #         score = -np.sum(dists)  
-    #         scores.append(score)
+        scores = np.array(scores)
+        scores -= np.max(scores)
+        exp_scores = np.exp(epsilon * scores / (2 * self.b**2))
+        probs = exp_scores / np.sum(exp_scores)
 
-    #     scores = np.array(scores)
-    #     scores -= np.max(scores)  # numerical stability
-
-    #     sensitivity = 2 * self.b**2
-    #     exp_scores = np.exp((epsilon * scores) / (2 * sensitivity))
-    #     probs = exp_scores / np.sum(exp_scores)
-
-    #     selected_idx = np.random.choice(len(subsets), p=probs)
-    #     return subsets[selected_idx]
-    
+        best_idx = np.random.choice(len(scores), p=probs)
+        chosen = candidates[np.random.choice(len(candidates), self.k, replace=False)]
+        return chosen
